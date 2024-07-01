@@ -239,45 +239,9 @@ class PicklePot:
     def __getitem__(self, item):
         return self.objects[item]
 
-
-
-
-
-def _test_picklepot(tmpdir='/home/jthomas/tmp/pickles/'):
-    tmpdir = pathlib.Path(tmpdir)
-    i0 = 'xxx'
-    i1 = 'aaa'
-    i2 = 'fff'
-    p = PicklePot(tmpdir, pickle_dir='fart')
-    p.dump(i0, 'o1', 'v0')
-    p.dump(i1, 'o1', 'v1')
-    p.dump(i1, 'o1', 'v1 overwrit', overwrite_latest=True)
-    p.dump(i2, 'o2')
-    p2 = PicklePot(tmpdir, pickle_dir='fart2')
-
-    # can load specific ver
-    assert  i0 == p.load_obj('o1', version=1)
-    # auto load objects match
-    assert p2['o1'] == i1
-    assert p2['o2'] == i2
-
-    print('ledger:', p.ledger())
-    print('ledger, latest only', p.ledger(latest_only=True))
-    print('ver history:', p.version_history('o1', print_it=True))
-    import glob
-    for fn in  glob.glob(str(tmpdir/'*.pickle')):
-        os.remove(fn)
-    os.remove(tmpdir/p._ledger_path)
-
-    os.rmdir(tmpdir)
-
-# things to test
-# - pickle/unpickle
-# - pull specific version
-# - overwrite version
-# -
-
 if __name__ == '__main__':
-    _test_picklepot()
+    p = Path('/home/jcthomas/tmp/picklepot')
+    from tests import test_initial
+    test_initial(p)
 
 
