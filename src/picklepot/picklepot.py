@@ -1,5 +1,6 @@
 import os, pickle, logging
 import pathlib
+from pathlib import Path
 import datetime
 
 logging.basicConfig()
@@ -10,39 +11,31 @@ try:
 except ImportError:
     logger.info('Pandas is not installed, ledger will loaded as a string.')
 
-#todo add hashing.
+#todo add hashing, at least to prevent having multiple identical versions.
 
 # pandas.util.hash_pandas_object returns a series same length as the original thing,
 #    could probbably hash(sum(thing.map(str)))
 
-#todo so what I could do is have every object in it's own directory with its
+# todomaybe so what I could do is have every object in it's own directory with its
 #  own history. So deleting that object entirely would be a case of deleting the dir...
 
-
-def print_assign_strings(self, potname='picklepot'):
-        # for k in self.objects:
-        #     print(f"{k} = {instance_name}.objects['{k}']")
-    s = f"""
-# to move picklepot objects to global...
-exclude = []
-for k in {potname}.objects:
-    if k not in exclude:
-        exec(f"{{k}} = {potname}.objects['{{k}}']")
-"""
-    print(s)
 
 class PicklePot:
     """Pickle objects, quickily load latest versions, previous versions are kept,
     not overwritten.
     """
 
-    def __init__(self, pickle_dir='pp',
-                 exclude:list=None, include_only:list=None, print_info=True):
-        """
-        If a
+    def __init__(self, pickle_dir:Path|str='picklepot', pot_name:str='pp',
+                 exclude:list[str]=None, include_only:list[str]=None, print_info=True):
+        """If pickle_dir contains
 
         Parameters:
-            pickle_dir (str): The directory path to load and dump pickled objects.
+            pickle_dir: The directory path to load and dump pickled objects.
+            pot_name: Just used for printing out instructions to load all objects to
+                global.
+            exclude: List of object names not to be loaded
+            include_only: If given, only objects from this list will be loaded.
+            print_info: Set to False to not print info about contents of pot.
 
         """
 
@@ -62,23 +55,41 @@ class PicklePot:
             try:
                 self.print_object_info()
             except FileNotFoundError:
-                print('No ledger file found. One will be created when an object is dumped.')
+                with open(self._ledger_path, 'w') as f:
+                    f.write('# data_format:1\n')
 
-        self.print_object_info()
+
+        self.print_assign_strings(pot_name)
+
+    @staticmethod
+    def print_assign_strings(potname):
+        s = f"""
+    # to move picklepot objects to global, assuming the pot is called `{potname}`
+    exclude = []
+    for k in {potname}.objects:
+        if k not in exclude:
+            exec(f"{{k}} = {potname}.objects['{{k}}']")
+    """
+        print(s)
 
     def _read_ledger(self) -> pd.DataFrame:
-        ledger = pd.read_csv(self._ledger_path, sep='\t', header=None)
-        ledger.columns = ['Name', 'Version', 'Info', 'Date']
-        # todo datatypes, and can pass columns in read_csv
+        cols = ['Name', 'Version', 'Info', 'Date']
+        dtypes = dict(zip(cols,  [str, int, str, str]))
+        ledger = pd.read_csv(self._ledger_path, sep='\t', header=None,
+                             names=cols, dtype=dtypes,
+                             parse_dates=True, skiprows=1)
+
         return ledger
 
 
     def print_latest_pickles(self):
+        """Print latest version number for all objects."""
         latest = self.versions()
         for k, v in latest.items():
             print(f"{k} - V{v}")
 
     def _write_to_ledger(self, objname, ver, info):
+        """Append a line to the ledger file."""
         ver = str(ver)
 
         with open(self._ledger_path, 'a') as f:
@@ -92,13 +103,13 @@ class PicklePot:
             )
 
     def ledger(self, latest_only=False, included_only=False) -> pd.DataFrame:
-        """A DataFrame of files written to the picklepot.
+        """A DataFrame of info on files written to the picklepot.
 
         Args:
             latest_only: When True, include only only the last written version for each
                 object name.
             included_only: When True, respect self.included and self.excluded. """
-        # todo seems to include excluded items.
+
         ledger = self._read_ledger()
 
         if included_only:
@@ -116,7 +127,8 @@ class PicklePot:
             for _, row in ledge.loc[idx].iterrows():
                 print(f"\tV{row.Version}, {row.Date},   {row.Info}")
 
-    def version_history(self, objname, print_it=True) -> pd.DataFrame:
+    def print_version_history(self, objname, print_it=True) -> None:
+        """Print version history for a specific object."""
         ledger = self.ledger()
         ledger:pd.DataFrame = ledger.loc[ledger.Name == objname]
         if print_it:
@@ -124,7 +136,6 @@ class PicklePot:
                 print(
                     f"{row.Version} ({row.Date}):  {row.Info}"
                 )
-        return ledger
 
     def versions(self, source_dir=None) -> dict[str, int]:
         """List available versions of pickled objects in source directory.
@@ -140,13 +151,12 @@ class PicklePot:
                     versions[obj_name] = version
         return versions
 
-    def _is_included(self, obj_name):
-        """"""
-        #todo figure out how to prioritise this
+    def _is_included(self, obj_name) -> bool:
+        """Include takes precidence if both are set (both should not be set)"""
         if self.include_only:
             if obj_name not in self.include_only:
                 return False
-        if obj_name in self.exclude:
+        elif obj_name in self.exclude:
             return False
         return True
 
@@ -207,7 +217,10 @@ class PicklePot:
             The loaded object.
         """
 
-        if version == 0:
+        if source_dir is None:
+            source_dir = self.pickle_dir
+
+        if version == 'latest':
             try:
                 version = self.versions(source_dir)[obj_name]
             except KeyError:
