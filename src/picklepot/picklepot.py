@@ -97,7 +97,7 @@ class PicklePot:
         with open(self._ledger_path, 'a') as f:
             d = datetime.datetime.now()
             now = f"{d.year}-{d.month}-{d.day} {d.hour}:{d.minute}"
-            info = info.replace('\t', '    ')
+            info = info.replace('\t', '    ').replace('\n', ' ')
             f.write(
                 '\t'.join(
                     [objname, ver, info, now]
