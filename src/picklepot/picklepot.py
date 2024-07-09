@@ -12,6 +12,8 @@ except ImportError:
     logger.info('Pandas is not installed, ledger will loaded as a string.')
 
 #todo add hashing, at least to prevent having multiple identical versions.
+#todo intialising a new pot should be it's own function that:
+#   creates path/files, don't print pointless things.
 
 # pandas.util.hash_pandas_object returns a series same length as the original thing,
 #    could probbably hash(sum(thing.map(str)))
