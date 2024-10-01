@@ -41,6 +41,9 @@ class PicklePot:
 
         """
 
+        pickle_dir = os.path.realpath(pickle_dir)
+
+
         if exclude and include_only:
             logger.warning("It doesn't make sense to set non-null values for both exclude and include_only, "
                            "exclude will be ignored.")
@@ -48,7 +51,9 @@ class PicklePot:
             exclude = []
         self.exclude = exclude
         self.include_only = include_only
-        os.makedirs(pickle_dir, exist_ok=True)
+        if not os.path.isdir(pickle_dir):
+            print(f'Creating directory {pickle_dir}')
+            os.makedirs(pickle_dir, exist_ok=True)
         self.pickle_dir = pickle_dir
         self.objects = {}
         self._ledger_path = pathlib.Path(self.pickle_dir) / f"picklepot_ledger.tsv"
